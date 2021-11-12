@@ -9,6 +9,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+import threading
 
 import cv2
 import numpy as np
@@ -46,7 +47,6 @@ kd=0.25
 global scenario #scenarios will play out the diff possible reasons of no detetction
 distance = 35 #fake distance
 
-
 @torch.no_grad()
 def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
         source=0, #ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
@@ -69,11 +69,13 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
         name='exp',  # save results to project/name
         exist_ok=False,  # existing project/name ok, do not increment
         line_thickness=3,  # bounding box thickness (pixels)
-        hide_labels=False,  # hide labels
+        hide_labels=False,  # hi,de labels
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
+        t1_time = 7, #use for multithread
         ):
+    
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
@@ -166,8 +168,9 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
             if len(det):
                 
+                
                 scenario =0
-                err_now = 0
+                #err_now = 0
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
@@ -225,7 +228,7 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
                                     FORWARD(SpeedNowL,SpeedNowR)
                                     scenario= 1
                                     
-                        if(g == "bucket" and distance >= 35 ): #to not follow the bucket detection, I added a argument to check whether it has past the gate(distance)
+                        if(g == "bucket" ):#and distance >= 35 ): #to not follow the bucket detection, I added a argument to check whether it has past the gate(distance)
                             if round((c1[0]+c2[0])/2) > 340 :
                                 M = pid2(err_now,kp, ki, kd)
                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
@@ -277,6 +280,7 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
 
             # Stream results
             im0 = annotator.result()
+            time.sleep(t1_time)
             if view_img:
                 #print(imgsz[0])
                 cv2.imshow(str(p), im0)
@@ -310,6 +314,7 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
         print(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
+    
 
 
 def parse_opt():
@@ -366,11 +371,25 @@ def pid2(error, kp, ki, kd):
     
     return abs(M_t)
 
+def tryout(n):
+    
+    time.sleep(n)
+    print("penis")
+    #print("slept for",n , "seconds")
+    
+
 def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
-    run(**vars(opt))
+    t1 = threading.Thread(target=(run(**vars(opt))))
+    t2 = threading.Thread(target=tryout, args = [1])
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    #run(**vars(opt))
 
 
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
+
