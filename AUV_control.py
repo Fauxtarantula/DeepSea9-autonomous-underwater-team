@@ -3,7 +3,17 @@ Run inference on images, videos, directories, streams, etc.
 
 Usage:
     $ python path/to/detect.py --source path/to/img.jpg --weights yolov5s.pt --img 640
+    
+List of to-do: 
+    killswitch - Implemented
+    pid - Implemented #technically, it is part of the detect
+    angle probem(always keep changing configurations) - Not Implemented
+    Thread:Sonar - Not Implemented, Compass - Implemented (has a hardcoded timer to ensure data was recorded), Get_err_angl - Not Implemented
+    Shave off reflection from top - Not Implemented
+    Confidence-level filter -Not Implemented
+    
 """
+
 
 import argparse
 import os
@@ -16,6 +26,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import time
+import queue
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -33,11 +44,9 @@ from utils.torch_utils import load_classifier, select_device, time_sync
 from ctrl_mod.get_dir import FORWARD, RIGHT_TURN, LEFT_TURN, stop
 from ctrl_mod.PID import PID
 #from ctrl_mod.Get_Ang_Mod import get_angle
-from ctrl_mod.trysome import tryout, q #big brain move here, we are gonna use queue to store our variables from the thread
-import queue
+from ctrl_mod.trysome import q, tryout #test
+#from ctrl_mod.CompassPi import get_angle2, q
 
-
-#ser = serial.Serial("/dev/ttyUSB0",9600) #may change
 M =0
 SpeedNowL = 65
 SpeedNowR = 65
@@ -48,8 +57,16 @@ kp=7
 ki=0.2
 kd=0.25
 global scenario #scenarios will play out the diff possible reasons of no detetction
-distance = 35 #fake distance
-timeR = time.time()
+
+
+#Initialize sonar and killswitch. Note that the sabertooth and compass does not need to be initialize as 
+#it has alr initialize in its respective module scripts.
+#GPIO.setmode(GPIO.BCM)
+#GPIO.setup(23,GPIO.IN)
+#ser = serial.Serial("/dev/ttyUSB0",9600) #may change
+#global test
+test = 0
+            
 
 @torch.no_grad()
 def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
@@ -77,7 +94,7 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
-        t1_time = 7, #use for multithread
+        thread1_time = 1, #use for multithread
         ):
     
     source = str(source)
@@ -93,10 +110,9 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
     set_logging()
     device = select_device(device)
     half &= device.type != 'cpu'  # half precision only supported on CUDA
-    
-    #t2 = threading.Thread(target=tryout, args = [7])#thread
-    
-# Load model
+    test = 0 #use for testing killswitch
+
+    # Load model
     w = str(weights[0] if isinstance(weights, list) else weights)
     classify, suffix, suffixes = False, Path(w).suffix.lower(), ['.pt', '.onnx', '.tflite', '.pb', '']
     check_suffix(w, suffixes)  # check weights have acceptable suffix
@@ -106,7 +122,6 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
         model = torch.jit.load(w) if 'torchscript' in w else attempt_load(weights, map_location=device)
         stride = int(model.stride.max())  # model stride
         names = model.module.names if hasattr(model, 'module') else model.names  # get class names
-        
         if half:
             model.half()  # to FP16
         if classify:  # second-stage classifier
@@ -160,6 +175,7 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
+            
             seen += 1
             if webcam:  # batch_size >= 1
                 p, s, im0, frame = path[i], f'{i}: ', im0s[i].copy(), dataset.count
@@ -173,6 +189,20 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+            #thread1 = threading.Thread(target = get_angle2, args= [thread1_time])
+            thread1 = threading.Thread(target = tryout, args= [thread1_time])
+            thread1.start()
+            time.sleep(thread1_time) #big brain move here. To prevent the detect from happening before taking in value from trysome module,
+            #we have to sleep it so that thread1 can have a head start and execute first before the inference. for now use 1 seconds. For practical, use 6
+            
+            test+=1
+            #print(test)#for killswitch
+            if test == 2:
+                sys.exit(0) #exit out of the program
+                
+            #if GPIO.input(23) == 0:#uncoment for actual testing
+                #sys.exit(0)
+                
             if len(det):
                 
                 
@@ -222,16 +252,10 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
                         if(g =="person"): #get the gate detection only, ignore rest. Note to change to gate
                             if round((c1[0]+c2[0])/2) > 340 :
                                 
-                                #Should I start thread here? yes
-                                #Big brain moment here, Instead of slowing down inference from main code, i'll use the thread which I called to set a timer whilst retrieving compass value
-                                t1 = threading.Thread(target=tryout, args = [4]) #can set timer to end thread for compass and slow down inference
-                                t1.start()
-                                
-                                print(q.get(1))
                                 M = pid2(err_now,kp, ki, kd)
                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
                                 scenario = 1
-                                print(t1) #idk why got so many threads come out but ye
+                                print(thread1)
                                 #err_now-=1 #testing out pid
                                  
                             else: 
@@ -270,14 +294,18 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
                         annotator.box_label(xyxy, label, color=colors(c, True))
                         if save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
-                            
+
             # Print time (inference-only)
             print(f'{s}Done. ({t3 - t2:.3f}s)')
-            t1.join()
+            thread1.join()
+            print(thread1.is_alive())
+            
             
             if not len(det): #check if detection is available
                 
                 if(scenario == 0):
+                    var =q.get(1)
+                    print(var)
                     M = pid2(err_now,kp, ki, kd)
                     LEFT_TURN(SpeedNowL, SpeedNowR, M)
                    # print("T")
@@ -297,12 +325,11 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
             # Stream results
             im0 = annotator.result()
             #time.sleep(t1_time)
+            
             if view_img:
                 #print(imgsz[0])
                 cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond  after keypress
-                #found out that thre should be a 'q' keypress.
-             
+                cv2.waitKey(1)  # 1 millisecond
 
             # Save results (image with detections)
             if save_img:
@@ -332,7 +359,6 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
         print(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
-    
 
 
 def parse_opt():
@@ -389,21 +415,18 @@ def pid2(error, kp, ki, kd):
     
     return abs(M_t)
 
+    
 def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
     #t1 = threading.Thread(target=(run(**vars(opt))))
-    #t1 = threading.Thread(target=tryout, args = [4]) #can set timer to end thread for compass
-    
+    #t2 = threading.Thread(target=tryout, args = [7])
     #t1.start()
-    
-    #for x in range(6):
-        #var = q.get(x)
-        #print(var)
     #t2.start()
     #t1.join()
     #t2.join()
     
     run(**vars(opt))
+    
 
 
 if __name__ == "__main__":
