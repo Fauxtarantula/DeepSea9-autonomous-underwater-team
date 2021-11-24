@@ -44,7 +44,8 @@ from utils.torch_utils import load_classifier, select_device, time_sync
 from ctrl_mod.get_dir import FORWARD, RIGHT_TURN, LEFT_TURN, stop
 from ctrl_mod.PID import PID
 #from ctrl_mod.Get_Ang_Mod import get_angle
-from ctrl_mod.trysome import q, tryout #test
+#from ctrl_mod.trysome import q, tryout #test
+from ctrl_mod.compass import get_angle2, q, compass_pausable, q1
 #from ctrl_mod.CompassPi import get_angle2, q
 
 M =0
@@ -69,7 +70,7 @@ test = 0
             
 
 @torch.no_grad()
-def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
+def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
         source=0, #ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
         imgsz=640,  # inference size (pixels)
         conf_thres=0.25,  # confidence threshold
@@ -94,7 +95,7 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
-        thread1_time = 1, #use for multithread
+        thread1_time = 6, #use for multithread
         ):
     
     source = str(source)
@@ -189,23 +190,24 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
-            #thread1 = threading.Thread(target = get_angle2, args= [thread1_time])
-            thread1 = threading.Thread(target = tryout, args= [thread1_time])
+            #thread1 = threading.Thread(target = get_angle2, args= [1])
+            #thread1 = threading.Thread(target = tryout, args= [thread1_time])
+            thread1 = threading.Thread(target = compass_pausable, args = [5])
             thread1.start()
-            time.sleep(thread1_time) #big brain move here. To prevent the detect from happening before taking in value from trysome module,
+            time.sleep(3) #big brain move here. To prevent the detect from happening before taking in value from trysome module,
             #we have to sleep it so that thread1 can have a head start and execute first before the inference. for now use 1 seconds. For practical, use 6
             
             test+=1
             #print(test)#for killswitch
-            if test == 2:
-                sys.exit(0) #exit out of the program
+            #if test == 2:
+                #sys.exit(0) #exit out of the program
                 
             #if GPIO.input(23) == 0:#uncoment for actual testing
                 #sys.exit(0)
                 
             if len(det):
                 
-                
+                print(q1.get())
                 scenario =0
                 #err_now = 0
                 # Rescale boxes from img_size to im0 size
@@ -249,7 +251,7 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
                             
                         #for now we are using the og pid
                     
-                        if(g =="person"): #get the gate detection only, ignore rest. Note to change to gate
+                        if(g =="Gate"): #get the gate detection only, ignore rest. Note to change to gate
                             if round((c1[0]+c2[0])/2) > 340 :
                                 
                                 M = pid2(err_now,kp, ki, kd)
@@ -298,14 +300,13 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
             # Print time (inference-only)
             print(f'{s}Done. ({t3 - t2:.3f}s)')
             thread1.join()
-            print(thread1.is_alive())
+            #print(thread1.is_alive())
             
             
             if not len(det): #check if detection is available
-                
+                print(q1.get())
                 if(scenario == 0):
-                    var =q.get(1)
-                    print(var)
+                    
                     M = pid2(err_now,kp, ki, kd)
                     LEFT_TURN(SpeedNowL, SpeedNowR, M)
                    # print("T")
@@ -363,7 +364,7 @@ def run(weights=ROOT / 'yolov5n.pt',  # model.pt path(s)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5n.pt', help='model path(s)')
+    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'gate.pt', help='model path(s)')
     parser.add_argument('--source', type=str, default=0, help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
@@ -432,4 +433,4 @@ def main(opt):
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
-
+ 
