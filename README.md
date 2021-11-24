@@ -6,13 +6,15 @@ Install the following dependencies in the requirement.txt
 
 # AUV
 ## Task to be done
-Object-detection (gate) - Implemented and Successful detection
-Object-detection (bucket) - Not Implemented
-Compass - Implemented
-Compass threading problem - Solved 
-Killswitch - Implemented
-PID - Implemented
-Depth code (Arduino Slave) - Implemented
-Sonar - Not Implemented
-Confidence level filter - Not Implemented
-Motor controls - Not Implemented
+1) Object-detection (gate) - Implemented and Successful detection
+2) Object-detection (bucket) - Not Implemented
+3) Compass - Implemented
+4) Compass threading problem - Solved
+5) Killswitch - Implemented
+6) PID - Implemented
+7) Depth code (Arduino Slave) - Implemented
+8) Sonar - Not Implemented
+9) Confidence level filter - Not Implemented
+10) Motor controls - Not Implemented
+
+
