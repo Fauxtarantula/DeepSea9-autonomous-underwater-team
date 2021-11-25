@@ -10,11 +10,13 @@ Install the following dependencies in the requirement.txt
 2) Object-detection (bucket) - Not Implemented
 3) Compass - Implemented
 4) Compass threading problem - Solved
-5) Killswitch - Implemented
-6) PID - Implemented
-7) Depth code (Arduino Slave) - Implemented
-8) Sonar - Not Implemented
-9) Confidence level filter - Not Implemented
-10) Motor controls - Not Implemented
+5) Compass threading optimized - Last iteration pushed
+6) Killswitch - Implemented
+7) PID - Implemented
+8) Depth code (Arduino Slave) - Implemented
+9) Sonar - Not Implemented
+10) Confidence level filter - Not Implemented
+11) Motor controls - Not Implemented
+12) Odometry - Not implemented
 
 
