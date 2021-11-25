@@ -138,12 +138,3 @@ def get_start_angle(timer):
             ref_angl = round(total_angl, 2)
             start_q.put(ref_angl)
             break
-    
-
-#For Testing        
-thread1 = threading.Thread(target = compass_pausable, args = [3])
-#thread1 = threading.Thread(target = get_start_angle, args = [1])
-thread1.start()
-print("1: ",q1.get())
-#print("2: ",q.get())
-thread1.join()
