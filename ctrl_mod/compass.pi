@@ -1,3 +1,4 @@
+
 import serial
 import time,threading
 import queue
@@ -7,12 +8,13 @@ import queue
 from ctypes import *
 #from pysabertooth import Sabertooth
 
-ser=serial.Serial('/dev/ttyUSB1',115200)
+ser=serial.Serial('/dev/ttyUSB0',115200)
 #myPing = Ping1D()
 #myPing.connect_serial("/dev/ttyUSB1",115200)
 
 q = queue.Queue()
 q1 = queue.Queue()
+start_q = queue.Queue()
 #compass code to read data from the compass
 def get_angle2():
     #ser.reset_input_buffer()
@@ -78,9 +80,9 @@ def get_angle2():
         #time.sleep(n)#cannot use time sleep
 
 
-#gayest solution ever to prevent the compass from taking a new refference point
+#Sussiest solution ever to prevent the compass from taking a new reference point
 #Problem is that compass wont chnage angle depite turning as when turned, it will take that as the new reference point due to the multithreading
-def compass_pausable(n): #This introduces a timer so that compass can take refference and angle per unit time. Hence, allowing us to seee the offset angle
+def compass_pausable(ref_ang): #This introduces a timer so that compass can take refference and angle per unit time. Hence, allowing us to seee the offset angle
     count = 0
     t1 = time.time()
     while(1):
@@ -88,19 +90,19 @@ def compass_pausable(n): #This introduces a timer so that compass can take reffe
         get_angle2()
             
         t2=time.time()
-        if (count == 0):
-            q.put(get_angle2())
-            count+=1 #exit after getting first value
-
-        if (t2-t1 > n): #to exit loop after getting as specific time n
+        #if (count == 0):
             #q.put(get_angle2())
+            #count+=1 #exit after getting first value
+
+        if (t2-t1 > 1): #to exit loop after getting as specific time n
+            
             q.put(get_angle2())
             break
         
-    start_angle = q.get()
+    #start_angle = q.get()#can be used for averaging out
     end_angle = q.get()
-    #ang_diff = calculate_ang_diff(start_angle, end_angle)#may need to take out
-    q1.put(end_angle)
+    ang_diff = calculate_ang_diff(end_angle, ref_ang)#may need to take out
+    q1.put(round(ang_diff, 2)) #can either round off or max 0dp idk up to me or how I feel lmao
     #print("result: ", calculate_ang_diff(start_angle, end_angle))
 
 #Getting diff in angles
@@ -130,18 +132,9 @@ def get_start_angle(timer):
         total_angl+=get_angle2()
         iteration_counter +=1
         t_elapsed = time.time()
-        print(get_angle2())
-        if(t_elapsed-t_start > timer):
+        #print(get_angle2())
+        if(t_elapsed-t_start > timer): #bRuH
             total_angl /= iteration_counter
             ref_angl = round(total_angl, 2)
-            print("avg angle: ", ref_angl)
+            start_q.put(ref_angl)
             break
-    
-
-#For Testing        
-#thread1 = threading.Thread(target = compass_pausable, args = [3])
-#thread1 = threading.Thread(target = get_start_angle, args = [1])
-#thread1.start()
-#print("1: ",q1.get())
-#print("2: ",q.get())
-#thread1.join()
