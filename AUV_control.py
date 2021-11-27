@@ -16,6 +16,7 @@ Current threads:
     Reference angle thread - start_thread
     Continuous compass thread - thread1
 """
+#note to self, I still yet to send the values over from raspberry to arduino. Hence, serial connection not done yet
 
 
 import argparse
@@ -448,4 +449,4 @@ def main(opt):
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
- 
+
