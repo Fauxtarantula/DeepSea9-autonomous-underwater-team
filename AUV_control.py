@@ -12,6 +12,9 @@ List of to-do:
     Shave off reflection from top - Not Implemented
     Confidence-level filter -Not Implemented
     
+Current threads:
+    Reference angle thread - start_thread
+    Continuous compass thread - thread1
 """
 
 
@@ -27,6 +30,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import time
 import queue
+import RPi.GPIO as GPIO
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -45,7 +49,7 @@ from ctrl_mod.get_dir import FORWARD, RIGHT_TURN, LEFT_TURN, stop
 from ctrl_mod.PID import PID
 #from ctrl_mod.Get_Ang_Mod import get_angle
 #from ctrl_mod.trysome import q, tryout #test
-from ctrl_mod.compass import get_angle2, q, compass_pausable, q1
+from ctrl_mod.compass import get_angle2, q, compass_pausable, q1, get_start_angle, start_q
 #from ctrl_mod.CompassPi import get_angle2, q
 
 M =0
@@ -62,8 +66,8 @@ global scenario #scenarios will play out the diff possible reasons of no detetct
 
 #Initialize sonar and killswitch. Note that the sabertooth and compass does not need to be initialize as 
 #it has alr initialize in its respective module scripts.
-#GPIO.setmode(GPIO.BCM)
-#GPIO.setup(23,GPIO.IN)
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(23,GPIO.IN)
 #ser = serial.Serial("/dev/ttyUSB0",9600) #may change
 #global test
 test = 0
@@ -95,7 +99,6 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
-        thread1_time = 6, #use for multithread
         ):
     
     source = str(source)
@@ -141,6 +144,12 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
         bs = 1  # batch_size
     vid_path, vid_writer = [None] * bs, [None] * bs
 
+    #Initialize and get the reference angle
+    thread_start = threading.Thread(target = get_start_angle, args = [1])
+    thread_start.start()
+    ref_ang = start_q.get()
+    thread_start.join()
+    
     # Run inference
     if pt and device.type != 'cpu':
         model(torch.zeros(1, 3, *imgsz).to(device).type_as(next(model.parameters())))  # run once
@@ -192,9 +201,14 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
             #thread1 = threading.Thread(target = get_angle2, args= [1])
             #thread1 = threading.Thread(target = tryout, args= [thread1_time])
-            thread1 = threading.Thread(target = compass_pausable, args = [5])
+            
+            while not q1.empty():#to flush out previous value of queue if due to thread problem.
+                q1.get()
+                
+            thread1 = threading.Thread(target = compass_pausable, args = [ref_ang])
             thread1.start()
-            time.sleep(3) #big brain move here. To prevent the detect from happening before taking in value from trysome module,
+            time.sleep(1)
+            #time.sleep(0) #big brain move here. To prevent the detect from happening before taking in value from trysome module,
             #we have to sleep it so that thread1 can have a head start and execute first before the inference. for now use 1 seconds. For practical, use 6
             
             test+=1
@@ -202,12 +216,13 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
             #if test == 2:
                 #sys.exit(0) #exit out of the program
                 
-            #if GPIO.input(23) == 0:#uncoment for actual testing
-                #sys.exit(0)
+            if GPIO.input(23) == 0:#uncomment for actual testing
+                sys.exit(0)
                 
             if len(det):
                 
                 print(q1.get())
+                
                 scenario =0
                 #err_now = 0
                 # Rescale boxes from img_size to im0 size
@@ -318,7 +333,7 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
                 
                 elif(scenario == 2):#This scenario will play out when bucket was detected but soon lose detection
                     M = pid2(err_now ,kp ,ki ,kd)
-                    LEFT_TURN(SpeedNowL,SpeedNowR, M) #bRUH
+                    LEFT_TURN(SpeedNowL,SpeedNowR, M) 
                     #print("C")
                     stop()#need to find a way around this
             
