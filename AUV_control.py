@@ -16,7 +16,6 @@ Current threads:
     Reference angle thread - start_thread
     Continuous compass thread - thread1
 """
-#note to self, I still yet to send the values over from raspberry to arduino. Hence, serial connection not done yet
 
 
 import argparse
@@ -32,6 +31,7 @@ import torch.backends.cudnn as cudnn
 import time
 import queue
 import RPi.GPIO as GPIO
+import serial
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -53,6 +53,10 @@ from ctrl_mod.PID import PID
 from ctrl_mod.compass import get_angle2, q, compass_pausable, q1, get_start_angle, start_q
 #from ctrl_mod.CompassPi import get_angle2, q
 
+#we need to initialize the arduino serial communication so,
+#ser2=serial.Serial('/dev/ttyACM0', 9600, timeout = 1) #initialize serial with arduino, may change also need to check
+#ser2.write(b"H")#activate sensor
+
 M =0
 SpeedNowL = 65
 SpeedNowR = 65
@@ -64,18 +68,17 @@ ki=0.2
 kd=0.25
 global scenario #scenarios will play out the diff possible reasons of no detetction
 
-
 #Initialize sonar and killswitch. Note that the sabertooth and compass does not need to be initialize as 
 #it has alr initialize in its respective module scripts.
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(23,GPIO.IN)
+GPIO.setup(22,GPIO.IN)
 #ser = serial.Serial("/dev/ttyUSB0",9600) #may change
 #global test
 test = 0
             
 
 @torch.no_grad()
-def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
+def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
         source=0, #ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
         imgsz=640,  # inference size (pixels)
         conf_thres=0.25,  # confidence threshold
@@ -100,6 +103,7 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
+        thread1_time = 6, #use for multithread
         ):
     
     source = str(source)
@@ -116,6 +120,7 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
     device = select_device(device)
     half &= device.type != 'cpu'  # half precision only supported on CUDA
     test = 0 #use for testing killswitch
+    #ser2.write(72) #72 to initialize, 76 to kill motors 
 
     # Load model
     w = str(weights[0] if isinstance(weights, list) else weights)
@@ -217,12 +222,13 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
             #if test == 2:
                 #sys.exit(0) #exit out of the program
                 
-            if GPIO.input(23) == 0:#uncomment for actual testing
+            if GPIO.input(22) == 0:#uncomment for actual testing
                 sys.exit(0)
-                
+            
             if len(det):
                 
-                print(q1.get())
+                err_now = q1.get()
+                print(err_now) #track err_now
                 
                 scenario =0
                 #err_now = 0
@@ -273,7 +279,7 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
                                 M = pid2(err_now,kp, ki, kd)
                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
                                 scenario = 1
-                                print(thread1)
+                                #print(thread1)
                                 #err_now-=1 #testing out pid
                                  
                             else: 
@@ -320,7 +326,8 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
             
             
             if not len(det): #check if detection is available
-                print(q1.get())
+                err_now = q1.get()
+                print(err_now) #track err_now
                 if(scenario == 0):
                     
                     M = pid2(err_now,kp, ki, kd)
@@ -380,7 +387,7 @@ def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'gate.pt', help='model path(s)')
+    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'Gate2.pt', help='model path(s)')
     parser.add_argument('--source', type=str, default=0, help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
@@ -434,7 +441,7 @@ def pid2(error, kp, ki, kd):
 
     
 def main(opt):
-    check_requirements(exclude=('tensorboard', 'thop'))
+    #check_requirements(exclude=('tensorboard', 'thop')) #fuck this shit. takes too long
     #t1 = threading.Thread(target=(run(**vars(opt))))
     #t2 = threading.Thread(target=tryout, args = [7])
     #t1.start()
@@ -449,4 +456,3 @@ def main(opt):
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
-
