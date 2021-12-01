@@ -148,11 +148,11 @@ def get_start_angle(timer): #should probably give 10-120 seconds
     t_start = time.time()
     
     while(1):   
-        try: #failsafe try-catch block
+        try: #failsafe try-catch block, will catch the exception and re run hte code. This hack was created by mean to prevent 0 readings from hte compass
             total_angl+=get_angle2()
         except:
-            total_angl = 0
             print("compass not working")
+            total_angl+=get_angle2()
             
         iteration_counter +=1
         t_elapsed = time.time()
