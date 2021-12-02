@@ -50,7 +50,8 @@ from ctrl_mod.get_dir import FORWARD, RIGHT_TURN, LEFT_TURN, stop
 from ctrl_mod.PID import PID
 #from ctrl_mod.Get_Ang_Mod import get_angle
 #from ctrl_mod.trysome import q, tryout #test
-from ctrl_mod.compass import get_angle2, q, compass_pausable, q1, get_start_angle, start_q
+from ctrl_mod.compass import get_angle2, q, compass_pausable, q1, get_start_angle, start_q, get_desired, \
+     desire_q
 #from ctrl_mod.CompassPi import get_angle2, q
 
 #we need to initialize the arduino serial communication so,
@@ -151,10 +152,23 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
     vid_path, vid_writer = [None] * bs, [None] * bs
 
     #Initialize and get the reference angle
-    thread_start = threading.Thread(target = get_start_angle, args = [1])
+    thread_start = threading.Thread(target = get_start_angle, args = [5])
+    
+    #Start threads
     thread_start.start()
+    #time.sleep(3)
+    #
+    
+    #save thread values here
     ref_ang = start_q.get()
+    #
+
     thread_start.join()
+    #
+    thread_desire = threading.Thread(target = get_desired, args = [5])
+    thread_desire.start()
+    desired_ang = desire_q.get()
+    thread_desire.join()
     
     # Run inference
     if pt and device.type != 'cpu':
@@ -276,6 +290,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
                         if(g =="Gate"): #get the gate detection only, ignore rest. Note to change to gate
                             if round((c1[0]+c2[0])/2) > 340 :
                                 
+                                err_now += desired_ang #+ go right, -go left
                                 M = pid2(err_now,kp, ki, kd)
                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
                                 scenario = 1
@@ -327,9 +342,10 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
             
             if not len(det): #check if detection is available
                 err_now = q1.get()
-                print(err_now) #track err_now
+                #print(err_now) #track err_now
                 if(scenario == 0):
-                    
+                    #err_now+=desired_ang #need to look into
+                    print(err_now)
                     M = pid2(err_now,kp, ki, kd)
                     LEFT_TURN(SpeedNowL, SpeedNowR, M)
                    # print("T")
