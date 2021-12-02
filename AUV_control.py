@@ -75,7 +75,7 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(22,GPIO.IN)
 #ser = serial.Serial("/dev/ttyUSB0",9600) #may change
 #global test
-test = 0
+#test = 0
             
 
 @torch.no_grad()
@@ -120,7 +120,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
     set_logging()
     device = select_device(device)
     half &= device.type != 'cpu'  # half precision only supported on CUDA
-    test = 0 #use for testing killswitch
+    #test = 0 #use for testing killswitch
     #ser2.write(72) #72 to initialize, 76 to kill motors 
 
     # Load model
@@ -219,32 +219,37 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
-            #thread1 = threading.Thread(target = get_angle2, args= [1])
-            #thread1 = threading.Thread(target = tryout, args= [thread1_time])
+            
             
             while not q1.empty():#to flush out previous value of queue if due to thread problem.
                 q1.get()
                 
-            thread1 = threading.Thread(target = compass_pausable, args = [ref_ang])
-            thread1.start()
+            
+            #thread1 = threading.Thread(target = compass_pausable, args = [ref_ang])
+            thread2 = threading.Thread(target = compass_pausable, args = [desired_ang])
+            #thread1.start()
+            thread2.start()
             time.sleep(1)
             #time.sleep(0) #big brain move here. To prevent the detect from happening before taking in value from trysome module,
             #we have to sleep it so that thread1 can have a head start and execute first before the inference. for now use 1 seconds. For practical, use 6
             
-            test+=1
+            #test+=1
             #print(test)#for killswitch
             #if test == 2:
                 #sys.exit(0) #exit out of the program
+            print(scenario)
                 
-            if GPIO.input(22) == 0:#uncomment for actual testing
+            if GPIO.input(22) == 0:#uncomment for actual testing, nevermind, killswitch does not fucking work
                 sys.exit(0)
             
             if len(det):
                 
-                err_now = q1.get()
-                print(err_now) #track err_now
+                #err_now_ref = q1.get()
+                err_now_desire = q1.get()
                 
-                scenario =0
+                #print(err_now) #track err_now
+                
+                #scenario =0
                 #err_now = 0
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -290,7 +295,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
                         if(g =="Gate"): #get the gate detection only, ignore rest. Note to change to gate
                             if round((c1[0]+c2[0])/2) > 340 :
                                 
-                                err_now += desired_ang #+ go right, -go left
+                                #err_now += desired_ang #+ go right, -go left
                                 M = pid2(err_now,kp, ki, kd)
                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
                                 scenario = 1
@@ -306,20 +311,20 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
                                     FORWARD(SpeedNowL,SpeedNowR)
                                     scenario= 1
                                     
-                        if(g == "bucket" ):#and distance >= 35 ): #to not follow the bucket detection, I added a argument to check whether it has past the gate(distance)
-                            if round((c1[0]+c2[0])/2) > 340 :
-                                M = pid2(err_now,kp, ki, kd)
-                                RIGHT_TURN(SpeedNowL,SpeedNowR,M)
-                                scenario = 2
-                                 
-                            else: 
-                                if round((c1[0]+c2[0])/2) < 300 :
-                                    LEFT_TURN(SpeedNowL,SpeedNowR,3)
-                                    scenario = 2
-                                    
-                                else:      
-                                    FORWARD(SpeedNowL,SpeedNowR)
-                                    scenario= 2
+#                         if(g == "bucket" ):#and distance >= 35 ): #to not follow the bucket detection, I added a argument to check whether it has past the gate(distance)
+#                             if round((c1[0]+c2[0])/2) > 340 :
+#                                 M = pid2(err_now,kp, ki, kd)
+#                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
+#                                 scenario = 2
+#                                  
+#                             else: 
+#                                 if round((c1[0]+c2[0])/2) < 300 :
+#                                     LEFT_TURN(SpeedNowL,SpeedNowR,3)
+#                                     scenario = 2
+#                                     
+#                                 else:      
+#                                     FORWARD(SpeedNowL,SpeedNowR)
+#                                     scenario= 2
                                 
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -336,27 +341,32 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
 
             # Print time (inference-only)
             print(f'{s}Done. ({t3 - t2:.3f}s)')
-            thread1.join()
+            #thread1.join()
+            thread2.join()
             #print(thread1.is_alive())
             
             
             if not len(det): #check if detection is available
-                err_now = q1.get()
+                #err_now_ref = q1.get()
+                err_now_desire = q1.get()
                 #print(err_now) #track err_now
                 if(scenario == 0):
-                    #err_now+=desired_ang #need to look into
-                    print(err_now)
-                    M = pid2(err_now,kp, ki, kd)
+                    #err_now=desired_ang-err_now #need to look into
+                    #print(err_now_ref)
+                    print(err_now_desire)
+                    M = pid2(err_now_desire,kp, ki, kd)
                     LEFT_TURN(SpeedNowL, SpeedNowR, M)
+                    #scenario +=1 #may make use of scenarios here
                    # print("T")
                     
                 elif(scenario == 1): #This sceneario will play out when gate was detected but soon lose the detection
-                    M = pid2(err_now,kp, ki, kd)
+                    M = pid2(err_now_desire,kp, ki, kd)
                     LEFT_TURN(SpeedNowL, SpeedNowR, M)
+                    scenario+=1
                     #print("L")
                 
                 elif(scenario == 2):#This scenario will play out when bucket was detected but soon lose detection
-                    M = pid2(err_now ,kp ,ki ,kd)
+                    M = pid2(err_now_desire,kp ,ki ,kd)
                     LEFT_TURN(SpeedNowL,SpeedNowR, M) 
                     #print("C")
                     stop()#need to find a way around this
