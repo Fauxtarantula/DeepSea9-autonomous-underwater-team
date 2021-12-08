@@ -1,5 +1,5 @@
 # Seamen-autonomous-underwater-team
-Full AUV experience when we return to monke
+We are a group of 4 amatuer engineering students diving into a world of underwater robotics. We are currently working on 2 different robots that is the Autonomous Underwater Vehicle and a research robot called the Hybrid Underwater Vehicle. 
 
 Object detection done with YOLOv5 framework
 Install the following dependencies in the requirement.txt
