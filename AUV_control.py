@@ -74,6 +74,8 @@ global scenario #scenarios will play out the diff possible reasons of no detetct
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(22,GPIO.IN)
 #ser = serial.Serial("/dev/ttyUSB0",9600) #may change
+ser2=serial.Serial('/dev/ttyACM0', 9600, timeout = 1)
+ser2.reset_input_buffer()
 #global test
 #test = 0
             
@@ -104,7 +106,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
-        thread1_time = 6, #use for multithread
+        #thread1_time = 6, #use for multithread
         ):
     
     source = str(source)
@@ -169,6 +171,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
     thread_desire.start()
     desired_ang = desire_q.get()
     thread_desire.join()
+    ang_type = 0
     
     # Run inference
     if pt and device.type != 'cpu':
@@ -224,33 +227,33 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
             while not q1.empty():#to flush out previous value of queue if due to thread problem.
                 q1.get()
                 
-            
+            if scenario == 1:
+                ang_type = ref_ang
+            else:
+                ang_type = desired_ang
+                
             #thread1 = threading.Thread(target = compass_pausable, args = [ref_ang])
-            thread2 = threading.Thread(target = compass_pausable, args = [desired_ang])
+            thread2 = threading.Thread(target = compass_pausable, args = [ang_type])
+            thread_send = threading.Thread(target = sendbytes)
+            #thread_killswitch = threading.Thread(target = killswitch)
             #thread1.start()
             thread2.start()
-            time.sleep(1)
-            #time.sleep(0) #big brain move here. To prevent the detect from happening before taking in value from trysome module,
-            #we have to sleep it so that thread1 can have a head start and execute first before the inference. for now use 1 seconds. For practical, use 6
+            thread_send.start()
+            #thread_killswitch.start()
             
-            #test+=1
-            #print(test)#for killswitch
-            #if test == 2:
-                #sys.exit(0) #exit out of the program
-            print(scenario)
-                
-            if GPIO.input(22) == 0:#uncomment for actual testing, nevermind, killswitch does not fucking work
-                sys.exit(0)
+            time.sleep(1)
+            thread_send.join()
+            #thread_killswitch.join()
+            killswitch()
+#             ser2.write(b'H')    
+#             if GPIO.input(22) == 0:#uncomment for actual testing, nevermind, killswitch does not fucking work
+#                 sys.exit(0)
             
             if len(det):
                 
                 #err_now_ref = q1.get()
                 err_now_desire = q1.get()
                 
-                #print(err_now) #track err_now
-                
-                #scenario =0
-                #err_now = 0
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
@@ -296,7 +299,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
                             if round((c1[0]+c2[0])/2) > 340 :
                                 
                                 #err_now += desired_ang #+ go right, -go left
-                                M = pid2(err_now,kp, ki, kd)
+                                M = pid2(err_now_desire,kp, ki, kd)
                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
                                 scenario = 1
                                 #print(thread1)
@@ -341,7 +344,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
 
             # Print time (inference-only)
             print(f'{s}Done. ({t3 - t2:.3f}s)')
-            #thread1.join()
+            
             thread2.join()
             #print(thread1.is_alive())
             
@@ -379,7 +382,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
             if view_img:
                 #print(imgsz[0])
                 cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+                #cv2.waitKey(1)  # 1 millisecond
 
             # Save results (image with detections)
             if save_img:
@@ -418,7 +421,7 @@ def parse_opt():
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
-    parser.add_argument('--max-det', type=int, default=1, help='maximum detections per image')
+    parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--view-img', action='store_true', help='show results')
     parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
@@ -442,6 +445,18 @@ def parse_opt():
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(FILE.stem, opt)
     return opt
+
+def sendbytes():
+    ser2.write(b'H')
+    #time.sleep(1)
+    
+    
+def killswitch():
+    line = ser2.readline().decode('utf-8').rstrip()
+    if(line == "stopped"):
+        #stop()
+        stop()
+        sys.exit(0)
 
 def pid2(error, kp, ki, kd):
     
