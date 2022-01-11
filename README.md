@@ -11,12 +11,12 @@ Install the following dependencies in the requirement.txt
 3) Compass - Implemented
 4) Compass threading problem - Solved
 5) Compass threading optimized - Last iteration pushed
-6) Killswitch - Not Implemented
+6) Killswitch - Implemented
 7) PID - Implemented
 8) Depth code (Arduino Slave) - Implemented
 9) Vertical thrusters - Implemented
-10) Sonar - Not Implemented
-11) Confidence level filter - Not Implemented
-12) Motor controls - Not Implemented
+10) Sonar - Implemented
+11) Confidence level filter - Implemented
+12) Motor controls - Implemented
 
 
