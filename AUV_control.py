@@ -46,17 +46,13 @@ from utils.general import apply_classifier, check_img_size, check_imshow, check_
     strip_optimizer, xyxy2xywh
 from utils.plots import Annotator, colors
 from utils.torch_utils import load_classifier, select_device, time_sync
-from ctrl_mod.get_dir import FORWARD, RIGHT_TURN, LEFT_TURN, stop
+from ctrl_mod.motor import FORWARD, RIGHT_TURN, LEFT_TURN, stop
+#from ctrl_mod.get_dir import FORWARD, RIGHT_TURN, LEFT_TURN, stop
 from ctrl_mod.PID import PID
-#from ctrl_mod.Get_Ang_Mod import get_angle
-#from ctrl_mod.trysome import q, tryout #test
+
 from ctrl_mod.compass import get_angle2, q, compass_pausable, q1, get_start_angle, start_q, get_desired, \
      desire_q
-#from ctrl_mod.CompassPi import get_angle2, q
-
-#we need to initialize the arduino serial communication so,
-#ser2=serial.Serial('/dev/ttyACM0', 9600, timeout = 1) #initialize serial with arduino, may change also need to check
-#ser2.write(b"H")#activate sensor
+from Algorithms.decide import direction
 
 M =0
 SpeedNowL = 65
@@ -81,12 +77,12 @@ ser2.reset_input_buffer()
             
 
 @torch.no_grad()
-def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
+def run(weights=ROOT / 'gate.pt',  # model.pt path(s)
         source=0, #ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
         imgsz=640,  # inference size (pixels)
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
-        max_det=1000,  # maximum detections per image
+        max_det=1,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         view_img=False,  # show results
         save_txt=False,  # save results to *.txt
@@ -154,7 +150,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
     vid_path, vid_writer = [None] * bs, [None] * bs
 
     #Initialize and get the reference angle
-    thread_start = threading.Thread(target = get_start_angle, args = [5])
+    thread_start = threading.Thread(target = get_start_angle, args = [30])
     
     #Start threads
     thread_start.start()
@@ -167,7 +163,7 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
 
     thread_start.join()
     #
-    thread_desire = threading.Thread(target = get_desired, args = [5])
+    thread_desire = threading.Thread(target = get_desired, args = [30])
     thread_desire.start()
     desired_ang = desire_q.get()
     thread_desire.join()
@@ -227,8 +223,8 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
             while not q1.empty():#to flush out previous value of queue if due to thread problem.
                 q1.get()
                 
-            if scenario == 1:
-                ang_type = ref_ang
+            if scenario == 1 or scenario == 2:
+                ang_type = ref_ang #this is to change the angle to the ref angle when detected
             else:
                 ang_type = desired_ang
                 
@@ -241,18 +237,16 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
             thread_send.start()
             #thread_killswitch.start()
             
-            time.sleep(1)
+            #time.sleep(1)
             thread_send.join()
             #thread_killswitch.join()
             killswitch()
-#             ser2.write(b'H')    
-#             if GPIO.input(22) == 0:#uncomment for actual testing, nevermind, killswitch does not fucking work
-#                 sys.exit(0)
-            
+
             if len(det):
                 
                 #err_now_ref = q1.get()
                 err_now_desire = q1.get()
+                print(err_now_desire)
                 
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -276,59 +270,30 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
                         n = (det[:, -1] == c).sum()  # detections per class
                         g = f"{names[int(c)]}" #g is the label of the object detected
                                   
-                        #pid code for every iteration (testing)
-                        #*err_now=get_angle(ser)
-                        #err2 = 4
-                        #err_last=4
-                        #for _ in range(10):
-                            
-                            #err=PID(int(err2), err_last, 2,0.2,2,3) #read from yaw
-                            #print(err[0]) #print PID_value
-                            #print(err_now)
-                        
-                            #err2-=1
-                            #if(err2>0):
-                                #err2-=1
-                            #err_last = err[0]
-                            #print(err)
-                            
-                            
-                        #for now we are using the og pid
+    
                     
                         if(g =="Gate"): #get the gate detection only, ignore rest. Note to change to gate
-                            if round((c1[0]+c2[0])/2) > 340 :
+                            if round((c1[0]+c2[0])/2) > 360: #added more arguments
                                 
                                 #err_now += desired_ang #+ go right, -go left
+                                err_now_desire = abs(err_now_desire)
                                 M = pid2(err_now_desire,kp, ki, kd)
                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
                                 scenario = 1
-                                #print(thread1)
-                                #err_now-=1 #testing out pid
+                                
                                  
                             else: 
-                                if round((c1[0]+c2[0])/2) < 300 :
-                                    LEFT_TURN(SpeedNowL,SpeedNowR,3)
-                                    scenario = 1
-                                    
-                                else:      
-                                    FORWARD(SpeedNowL,SpeedNowR)
-                                    scenario= 1
-                                    
-#                         if(g == "bucket" ):#and distance >= 35 ): #to not follow the bucket detection, I added a argument to check whether it has past the gate(distance)
-#                             if round((c1[0]+c2[0])/2) > 340 :
-#                                 M = pid2(err_now,kp, ki, kd)
-#                                 RIGHT_TURN(SpeedNowL,SpeedNowR,M)
-#                                 scenario = 2
-#                                  
-#                             else: 
-#                                 if round((c1[0]+c2[0])/2) < 300 :
-#                                     LEFT_TURN(SpeedNowL,SpeedNowR,3)
-#                                     scenario = 2
-#                                     
-#                                 else:      
-#                                     FORWARD(SpeedNowL,SpeedNowR)
-#                                     scenario= 2
+                                if round((c1[0]+c2[0])/2) < 280:
+                                    err_now_desire = abs(err_now_desire)
+                                    M = pid2(err_now_desire,kp,ki,kd)
+                                    LEFT_TURN(SpeedNowL,SpeedNowR,M)
+                                    scenario = 2
                                 
+                                
+                                else:      #change placement
+                                    FORWARD(SpeedNowL,SpeedNowR)
+                                    #scenario= 1
+                                    
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
@@ -352,26 +317,49 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
             if not len(det): #check if detection is available
                 #err_now_ref = q1.get()
                 err_now_desire = q1.get()
-                #print(err_now) #track err_now
+                #print(scenario)
+                
+                #whle thng here to move forward
                 if(scenario == 0):
-                    #err_now=desired_ang-err_now #need to look into
-                    #print(err_now_ref)
-                    print(err_now_desire)
-                    M = pid2(err_now_desire,kp, ki, kd)
-                    LEFT_TURN(SpeedNowL, SpeedNowR, M)
+                    
+                    #print(err_now_desire)
+                    if direction(err_now_desire) ==0:#change here
+                        err_now_desire = abs(err_now_desire)
+                        print(err_now_desire)
+                        M = pid2(err_now_desire,kp, ki, kd)
+                        RIGHT_TURN(SpeedNowL, SpeedNowR, M)
+                        #scenario = 1#test
+                        
+                    elif direction(err_now_desire)==1:
+                        FORWARD(SpeedNowL, SpeedNowR)
+                    else:
+                        M = pid2(err_now_desire,kp, ki, kd)
+                        LEFT_TURN(SpeedNowL, SpeedNowR, M)
+                        #scenario =2#test
+                    
+                    
                     #scenario +=1 #may make use of scenarios here
                    # print("T")
                     
-                elif(scenario == 1): #This sceneario will play out when gate was detected but soon lose the detection
+                elif(scenario == 1): #This sceneario will play out when gate was detected but soon lose the detection(move 5 degrees or smth)
+                    #need to change to desired here
+                    newSpeedNowR = 65
+                    err_now_desire = abs(err_now_desire)
                     M = pid2(err_now_desire,kp, ki, kd)
-                    LEFT_TURN(SpeedNowL, SpeedNowR, M)
-                    scenario+=1
+                    LEFT_TURN(SpeedNowL, newSpeedNowR, M)
+                    #scenario = 0
+                    #scenario+=1
                     #print("L")
                 
-                elif(scenario == 2):#This scenario will play out when bucket was detected but soon lose detection
+                elif(scenario == 2):#This scenario will play out when gate was detected but soon lose detection(left)
+                    #same here
+                    newSpeedNowL = 65
+                    err_now_desire = abs(err_now_desire)
                     M = pid2(err_now_desire,kp ,ki ,kd)
-                    LEFT_TURN(SpeedNowL,SpeedNowR, M) 
+                    RIGHT_TURN(newSpeedNowL,SpeedNowR, M)
+                    #scenario = 0
                     #print("C")
+                else:
                     stop()#need to find a way around this
             
 
@@ -416,12 +404,12 @@ def run(weights=ROOT / 'Gate2.pt',  # model.pt path(s)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'Gate2.pt', help='model path(s)')
+    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'gate.pt', help='model path(s)')
     parser.add_argument('--source', type=str, default=0, help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
-    parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
+    parser.add_argument('--max-det', type=int, default=1, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--view-img', action='store_true', help='show results')
     parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
@@ -452,6 +440,7 @@ def sendbytes():
     
     
 def killswitch():
+    time.sleep(1)
     line = ser2.readline().decode('utf-8').rstrip()
     if(line == "stopped"):
         #stop()
