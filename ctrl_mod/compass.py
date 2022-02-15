@@ -109,7 +109,7 @@ def compass_pausable(ref_ang): #This introduces a timer so that compass can take
             #q.put(get_angle2())
             #count+=1 #exit after getting first value
 
-        if (t2-t1 > 1): #to exit loop after getting as specific time n
+        if (t2-t1 > 0.3): #to exit loop after getting as specific time n
             
             q.put(get_angle2())
             break
@@ -125,13 +125,28 @@ def compass_pausable(ref_ang): #This introduces a timer so that compass can take
 def calculate_ang_diff(ang1, ang2): #can use to see whether to turn left or right, need to change abit. ang2 is the ref_ang
         
     if (ang1 > ang2):
-        #ang_diff= ang1-ang2
-        ang_diff = ang1-ang2
-        #boo = 0#this is a terrible programming practice. DO NOT EVER FUCKING USE THIS IN INDUSTRY
+        
+        ang_diff1 = ang1-ang2
+        ang_diff2 = 360-ang1+ang2
+        if(ang_diff1<ang_diff2):
+            ang_diff = ang_diff1
+        elif(ang_diff2<ang_diff1):
+            ang_diff = ang_diff2
+        else:
+            ang_diff = ang_diff1
+        
         
     elif (ang2 > ang1):
         #ang_diff = ang1-ang2
-        ang_diff = ang2-ang1
+        ang_diff1 = ang2-ang1#ang2-ang1
+        ang_diff2 = 360-ang2+ang1
+        
+        if(ang_diff1<ang_diff2):
+            ang_diff = ang_diff1
+        elif(ang_diff1>ang_diff2):
+            ang_diff = ang_diff2
+        else:
+            ang_diff= ang_diff1
         #ang_diff = abs[ang_diff]
         #boo = 1
     else:
@@ -139,15 +154,14 @@ def calculate_ang_diff(ang1, ang2): #can use to see whether to turn left or righ
         #boo = 2
         
     return ang_diff #, boo
-
 #method to get reference angle
 def get_start_angle(timer): #should probably give 10-120 seconds
     #timer based? idk
     total_angl = 0
     iteration_counter =0
     
-    print("Get ready, ",timer,"seconds till start")
-    time.sleep(timer)
+    print("You have chosen to take average in a span of", timer,"sec, 10 sec starts now")
+    time.sleep(10)
     
     print("Starting...")
     t_start = time.time()
@@ -159,7 +173,7 @@ def get_start_angle(timer): #should probably give 10-120 seconds
             #total_angl = 0
             print("---Compass stopped working---Reinitiating again---get_start_angle thread")
             #total_angl += get_angle2()
-            
+        #print("Successful connection")    
         iteration_counter +=1
         t_elapsed = time.time()
         #print(get_angle2())
@@ -167,7 +181,7 @@ def get_start_angle(timer): #should probably give 10-120 seconds
             total_angl /= iteration_counter
             ref_angl = round(total_angl, 2)
             start_q.put(ref_angl)
-            print("Done taking ref angl, 10 seconds starts")
+            print("Done taking ref angl. Another 10 seconds to start")
             time.sleep(10)
             break
 
@@ -183,6 +197,7 @@ def get_desired(ref_ang):
         except:
             print("---Compass stopped working---Reinitiating again---get_desired thread")
         
+        #print("successful connection")
         i_counter+=1
         desire_end =time.time()
         if(desire_end-desire_start > 5):#10 seconds for now
@@ -193,53 +208,3 @@ def get_desired(ref_ang):
             desire_q.put(desire)
             print("Done taking desire")
             break
-# #For Testing        
-# #thread1 = threading.Thread(target = compass_pausable, args = [3])
-# thread1 = threading.Thread(target = get_start_angle, args = [10])
-# thread1.start()
-# #print("1: ",q1.get())
-# #print("2: ",q.get())
-# 
-# thread1.join()
-# ref= start_q.get()
-# thread2 = threading.Thread(target = get_desired, args = [ref])
-# thread2.start()
-# thread2.join()
-# #print(desire_q.get())
-# 
-# desire = desire_q.get()
-#  #cannot work with while loop
-# while(1):
-# #ser2.write(b"H") #must be in bytes
-#     #print(get_angle2())
-#     
-#     #thread1 = threading.Thread(target = get_start_angle, args = [1])
-#     #thread1.start()
-#     #print("1: ",start_q.get())
-#     #thread1.join()
-#     
-#     #thread3 = threading.Thread(target = compass_pausable, args = [ref]) #for ref angle
-#     thread4 = threading.Thread(target = compass_pausable, args = [desire]) #for desired angle
-#     #thread3.start()
-#     thread4.start()
-#     #thread3.join()
-#     thread4.join()
-#     
-#     err = q1.get()#float(round(q1.get(),2))
-#     #variant = q1.get()
-#     #new_err = 0
-#     
-#     
-#     #if variant == 0:# important part
-#         #new_err=desire-err
-#         #new_err+=err
-#     #else:
-#         #new_err=err-desire
-#         #new_err = 10
-#         
-#        
-#     print(err)
-#     #print(variant)
-#     
-#     while not q1.empty(): #flush out
-#         q1.get()
