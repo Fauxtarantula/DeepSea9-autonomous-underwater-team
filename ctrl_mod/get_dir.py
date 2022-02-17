@@ -13,8 +13,8 @@ import time
 tre = 3
 
 def FORWARD(m1, m2):
-    #saber.drive(2,-m1)
-    #saber.drive(1,-m2)
+    saber.drive(2,-m1)
+    saber.drive(1,-m2)
     
     print("m1:",m1)
     print("m2:",m2)
@@ -25,8 +25,8 @@ def FORWARD(m1, m2):
     
 def RIGHT_TURN(m1, m2,M):
     new_m1=int(m1*(1.0-(M/100.0)))
-    #saber.drive(2,-new_m1)
-    #saber.drive(1,-m2)
+    saber.drive(2,-new_m1)
+    saber.drive(1,-m2)
     
     print("m1:",new_m1)
     print("m2:",m2)
@@ -35,8 +35,8 @@ def RIGHT_TURN(m1, m2,M):
 
 def LEFT_TURN(m1,m2,M):
     new_m2=int(m2*(1.0-(M/100.0)))
-    #saber.drive(2,-m1)
-    #saber.drive(1,-new_m2)
+    saber.drive(2,-m1)
+    saber.drive(1,-new_m2)
     
     print("m1:",m1)
     print("m2:",new_m2)
@@ -44,8 +44,8 @@ def LEFT_TURN(m1,m2,M):
     print("=================")
                
 def stop():
-    #saber.drive(1,0)
-    #saber.drive(2,0)
+    saber.drive(1,0)
+    saber.drive(2,0)
     
     print("m1: 0")
     print("m2: 0")
