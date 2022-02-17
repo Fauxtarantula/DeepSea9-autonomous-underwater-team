@@ -51,6 +51,3 @@ def stop():
     print("m2: 0")
     print("Stopping\n")
     
-    f = open("state.txt", "w")
-    f.write("2")
-    f.close()
