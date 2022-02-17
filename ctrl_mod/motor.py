@@ -9,7 +9,7 @@ import cv2
 import time
 #from ctypes import *
 #from pysabertooth import Sabertooth #uncomment once doing real testing
-#saber=Sabertooth('/dev/ttyS0',baudrate=9600,address=128,timeout=0.1)
+saber=Sabertooth('/dev/ttyS0',baudrate=9600,address=128,timeout=0.1)
 tre = 3
 
 def FORWARD(m1, m2):
