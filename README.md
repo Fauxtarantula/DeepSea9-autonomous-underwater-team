@@ -1,14 +1,5 @@
 
-
-
-
-
-
-
-
-
-
-
+![lmao](https://user-images.githubusercontent.com/68525714/157446477-3ef78905-786f-4bcc-9c1f-8c8af112126f.png)
 
 
 # Seamen-autonomous-underwater-team
