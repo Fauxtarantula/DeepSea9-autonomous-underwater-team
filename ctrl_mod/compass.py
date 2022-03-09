@@ -61,7 +61,7 @@ def get_angle2():
         y= data5 + data6 + data7 + data8
         z = data9 + data10 + data11 + data12
                 
-        cp= pointer(c_int(z)) #makes x into c int
+        cp= pointer(c_int(z)) #
         fp=cast(cp,POINTER(c_float))
         H=fp.contents.value
                 
@@ -121,7 +121,7 @@ def compass_pausable(ref_ang): #This introduces a timer so that compass can take
     #q1.put(variant)#can either round off or max 0dp idk up to me or how I feel lmao
     #print("result: ", calculate_ang_diff(start_angle, end_angle))
 
-#Getting diff in angles
+#Getting diff in angles/ calculating angle error for PID caompared to set angle
 def calculate_ang_diff(ang1, ang2): #can use to see whether to turn left or right, need to change abit. ang2 is the ref_ang
         
     if (ang1 > ang2):
@@ -144,9 +144,9 @@ def calculate_ang_diff(ang1, ang2): #can use to see whether to turn left or righ
         if(ang_diff1<ang_diff2):
             ang_diff = ang_diff1
         elif(ang_diff1>ang_diff2):
-            ang_diff = ang_diff2
+            ang_diff = -ang_diff2
         else:
-            ang_diff= ang_diff1
+            ang_diff= -ang_diff1
         #ang_diff = abs[ang_diff]
         #boo = 1
     else:
@@ -177,8 +177,8 @@ def get_start_angle(timer): #should probably give 10-120 seconds
         iteration_counter +=1
         t_elapsed = time.time()
         #print(get_angle2())
-        if(t_elapsed-t_start > timer): #bRuH
-            total_angl /= iteration_counter
+        if(t_elapsed-t_start > timer): #tiem set to record readings of angles
+            total_angl /= iteration_counter #grab average angle value
             ref_angl = round(total_angl, 2)
             start_q.put(ref_angl)
             print("Done taking ref angl. Another 10 seconds to start")
