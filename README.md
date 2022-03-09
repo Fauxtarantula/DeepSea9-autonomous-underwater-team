@@ -1,3 +1,16 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Seamen-autonomous-underwater-team
 We are a group of 4 amatuer engineering students diving into a world of underwater robotics. We are currently working on 2 different robots that is the Autonomous Underwater Vehicle and a research robot called the Hybrid Underwater Vehicle. 
 
@@ -18,5 +31,12 @@ Install the following dependencies in the requirement.txt
 10) Sonar - Implemented
 11) Confidence level filter - Implemented
 12) Motor controls - Implemented
+
+## Completed SAUVC challenges/tasks
+1) Qualification task - Done
+2) Gate navigation - Done
+3) Bucket navigation and ball placement - Incomplete
+4) Manipulators to grab ball - Incomplete
+5) Hitting a target off - Incomplete
 
 
