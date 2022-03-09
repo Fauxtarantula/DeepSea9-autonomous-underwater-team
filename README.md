@@ -2,7 +2,7 @@
 ![lmao](https://user-images.githubusercontent.com/68525714/157446477-3ef78905-786f-4bcc-9c1f-8c8af112126f.png)
 
 
-# Seamen-autonomous-underwater-team
+# DeepSea9-autonomous-underwater-team
 We are a group of 4 amatuer engineering students diving into a world of underwater robotics. We are currently working on 2 different robots that is the Autonomous Underwater Vehicle and a research robot called the Hybrid Underwater Vehicle. 
 
 Object detection done with YOLOv5 framework
